@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Release
+
+on:
+  push:
+    tags:
+    - 'v*'
+    - 'test-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        persist-credentials: false
+        fetch-depth: 0
+    - uses: actions/setup-go@v3
+      with:
+        go-version-file: go.mod
+    - run: go build -v ./cmd/rancher-desktop-guestagent
+    - uses: actions/upload-artifact@v2
+      with:
+        name: rancher-desktop-guestagent
+        path: rancher-desktop-guestagent
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: rancher-desktop-guestagent
+    - id: ref
+      run: |
+        ref="${{ github.ref }}"
+        echo "::set-output name=ref::${ref#refs/tags/}"
+    - name: Create release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ steps.ref.outputs.ref }}
+      run: >-
+        gh release create
+        "${ref}"
+        "rancher-desktop-guestagent"
+        --draft
+        --title "${tag}"
+        --repo ${{ github.repository }}
